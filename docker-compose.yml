@@ -1,0 +1,8 @@
+services:
+  agentmatrix:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      AGENTMATRIX_MODE: deterministic
+      AGENTMATRIX_REQUIRE_APPROVAL_FOR_WRITES: "true"
