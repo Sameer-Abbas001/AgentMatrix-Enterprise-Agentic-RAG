@@ -37,6 +37,18 @@ def test_run_sends_retrieved_evidence_to_ollama(ollama_api, monkeypatch):
     assert response.json()["answer"] == "Production changes require approval [kb-001]."
 
 
+def test_run_skips_ollama_when_no_sources_match(ollama_api, monkeypatch):
+    def unexpected_chat(*args, **kwargs):
+        pytest.fail("Ollama must not be called for a run without retrieved evidence.")
+
+    monkeypatch.setattr(httpx, "post", unexpected_chat)
+    response = ollama_api.post("/v1/agent/run", json={"task": "What is the capital of France?"})
+
+    assert response.status_code == 200
+    assert response.json()["evidence"] == []
+    assert "couldn't find relevant evidence" in response.json()["answer"]
+
+
 @pytest.mark.parametrize("model_status,ready_status", [(200, 200), (404, 503)])
 def test_readiness_checks_the_configured_model(ollama_api, monkeypatch, model_status, ready_status):
     def show(url, *, json, **kwargs):

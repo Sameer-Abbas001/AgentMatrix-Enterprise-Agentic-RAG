@@ -7,7 +7,7 @@ sdk: static
 app_file: index.html
 pinned: true
 license: mit
-short_description: Governed agentic RAG, MCP and evaluation platform
+short_description: Policy Q&A, evidence retrieval and MCP tools
 tags:
 - agentic-ai
 - langchain
@@ -23,9 +23,9 @@ tags:
 
 # AgentMatrix Enterprise
 
-**Governed Agentic RAG + Tool-Use Platform with LangGraph, LangChain, MCP, Evaluation, Observability and Human Approval**
+**Evidence-grounded policy Q&A with LangGraph, Ollama, and standalone MCP tools**
 
-AgentMatrix Enterprise is a recruiter-facing demonstration of a production-oriented LLM/agent platform. The public Hugging Face Space is intentionally a free Static Space; the executable FastAPI, LangGraph, LangChain adapter, MCP v2 server, policy controls, tests and Docker implementation live in GitHub.
+This static overview describes the AgentMatrix Enterprise repository. The executable project includes FastAPI, LangGraph, Ollama, an optional LangChain adapter, a standalone MCP v2 server, tests, and Docker packaging.
 
 ## Verified engineering evidence
 
@@ -36,7 +36,7 @@ AgentMatrix Enterprise is a recruiter-facing demonstration of a production-orien
 | Unit tests | 6/6 passed |
 | Deterministic contract evaluation | 3/3 passed |
 | Expected evidence recall in contract cases | 1.0 for all 3 cases |
-| Approval-policy correctness | Passed for all 3 cases |
+| Expected approval field | Matched in all 3 cases |
 | Docker image build | Passed |
 | Dependency audit | Passed after audited build-toolchain hardening |
 
@@ -49,25 +49,23 @@ User / API
    ↓
 Request validation + policy pre-check
    ↓
-LangGraph supervisor workflow
-   ├── Retrieval / evidence
-   ├── MCP typed tools
-   └── Human approval boundary for side effects
+Keyword retrieval over three sample policies
    ↓
-Evidence-backed synthesis
+Answer synthesis with retrieved evidence
    ↓
-Trace + evaluation artifacts
+Answer + evidence + run trace
 ```
 
-## Senior engineering signal
+The separate MCP server exposes knowledge search and action proposals. Write proposals return an approval requirement.
+
+## Implemented capabilities
 
 - LangGraph stateful orchestration
 - LangChain provider abstraction
 - MCP v2 typed tool interoperability
 - evidence/provenance contracts
 - prompt-injection policy checks
-- allowlisted read/write tool governance
-- human approval boundary for side effects
+- allowlisted MCP action proposals
 - reproducible offline evaluation
 - FastAPI service contract
 - Docker packaging

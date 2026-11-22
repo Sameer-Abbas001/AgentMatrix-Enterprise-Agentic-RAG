@@ -30,6 +30,8 @@ def build_graph(settings: Settings):
         if state.get("answer"):
             return {}
         evidence = state.get("evidence", [])
+        if not evidence:
+            return {"answer": "I couldn't find relevant evidence in the policy knowledge base."}
         if settings.mode == "langchain":
             answer = langchain_synthesis(state["task"], evidence, settings.model)
         elif settings.mode == "ollama":

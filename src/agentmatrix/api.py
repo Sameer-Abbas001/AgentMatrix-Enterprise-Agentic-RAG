@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from agentmatrix.config import get_settings
@@ -10,11 +14,18 @@ from agentmatrix.model import OllamaError, ollama_model_ready
 from agentmatrix.observability import Trace
 
 app = FastAPI(title="AgentMatrix Enterprise", version="0.1.0")
+WEB_DIRECTORY = Path(__file__).with_name("web")
+app.mount("/assets", StaticFiles(directory=WEB_DIRECTORY / "assets"), name="assets")
 
 
 class RunRequest(BaseModel):
     task: str = Field(min_length=3, max_length=8000)
     approved: bool = False
+
+
+@app.get("/", include_in_schema=False)
+def workspace() -> FileResponse:
+    return FileResponse(WEB_DIRECTORY / "index.html")
 
 
 @app.get("/health")

@@ -6,8 +6,9 @@ from agentmatrix.config import Settings
 from agentmatrix.state import Evidence
 
 SYSTEM_PROMPT = (
-    "You are an enterprise evidence-synthesis agent. Use only supplied evidence, cite "
-    "evidence IDs, and state when evidence is insufficient."
+    "You are an enterprise evidence-synthesis agent. Use only supplied evidence. "
+    "Cite the supplied evidence IDs in square brackets next to the claims they support. "
+    "State when evidence is insufficient."
 )
 
 

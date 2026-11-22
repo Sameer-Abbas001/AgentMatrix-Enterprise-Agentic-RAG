@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agentmatrix-enterprise"
 version = "0.1.0"
-description = "Governed agentic RAG and tool-use reference platform with LangGraph, LangChain and MCP"
+description = "Evidence-grounded policy Q&A with LangGraph, Ollama, and standalone MCP tools"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}

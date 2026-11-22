@@ -1,26 +1,21 @@
 # AgentMatrix Enterprise
 
-**Governed Agentic RAG + Tool-Use Platform with LangGraph, LangChain, MCP, Evaluation, Observability, and Human Approval**
+**Evidence-grounded policy Q&A with LangGraph, Ollama, MCP tools, and reproducible evaluation**
 
 > Portfolio project by **Sameer Abbas**.
 
-AgentMatrix Enterprise is a production-oriented reference implementation for building auditable LLM agents that can retrieve evidence, select tools, enforce policy, pause for human approval, and emit machine-readable execution traces. It deliberately separates **executed evidence** from **architecture claims**: the default demo works without an API key using a deterministic planner, while real LLM providers can be enabled explicitly.
+AgentMatrix Enterprise answers questions over three sample policy documents. It ranks evidence by keyword overlap and sends relevant excerpts to Ollama in the AWS demo. The interviewer workspace shows the answer, retrieved excerpts, match scores, and execution trace. A deterministic mode supports local development and CI without a model API key.
 
-## Why this project is different
+## Project capabilities
 
-Most RAG demos stop at `question -> retrieve -> generate`. AgentMatrix models the controls expected around a serious agentic system:
-
-- **LangGraph state machine** for deterministic + agentic orchestration
-- **LangChain agent/model adapter** for provider-neutral LLM integration
-- **MCP v2 server** exposing typed enterprise tools
-- hybrid retrieval interface with evidence scoring
-- allowlisted tool policy + write-action approval boundary
-- prompt-injection heuristics and PII-aware handling hooks
-- reproducible offline evaluation dataset and quality gates
-- trace IDs, latency, tool-call counts, evidence IDs, and policy events
-- FastAPI service boundary
-- Docker and GitHub Actions
-- free-plan-compatible Hugging Face static evidence/demo surface
+- **LangGraph** runs the policy precheck, evidence retrieval, and answer synthesis.
+- **Ollama** generates answers on EC2. A separate opt-in **LangChain** adapter supports other providers.
+- **Keyword retrieval** ranks the sample policies by the share of meaningful query terms they match. Context includes the highest-ranked sources and any others that match at least half as many terms. Queries with zero matches return an evidence gap before generation.
+- **MCP v2** exposes typed knowledge search and action proposal tools over stdio. The proposal tool checks an allowlist and flags write actions for explicit approval.
+- **Policy prechecks** detect known prompt-injection phrases.
+- **Run traces** include evidence IDs, policy events, and latency. The API response includes a tool-call field for integrations.
+- **Offline evaluation** checks expected evidence coverage and the approval response field against tracked fixtures.
+- **FastAPI**, **Docker**, and **GitHub Actions** provide the service, packaging, and CI. The repository also includes a static Hugging Face Space bundle.
 
 ## Architecture
 
@@ -31,28 +26,20 @@ User / API
 Request validation + policy pre-check
    |
    v
-LangGraph Supervisor
-   |-------------------------------|
-   v               v               v
-Research node    Tool node      Approval node
-   |               |               |
-   v               v               v
-Retriever       MCP registry    Human decision
-   |               |               |
-   |---------------|---------------|
-                   v
-             Evidence grader
-                   |
-                   v
-             Answer synthesis
-                   |
-                   v
-       Trace + evaluation artifacts
+Keyword retrieval and ranking
+   |
+   v
+Synthesis with retrieved evidence, or an evidence-gap response
+   |
+   v
+Answer + evidence + run trace
 ```
+
+The standalone MCP server exposes search and policy proposals to MCP clients. The HTTP Q&A workflow runs independently.
 
 ## Safe default mode
 
-`AGENTMATRIX_MODE=deterministic` is the default. It requires **no model API key** and demonstrates orchestration, retrieval, policy, MCP-style tools, approvals, and evaluation without pretending a proprietary LLM executed anything.
+`AGENTMATRIX_MODE=deterministic` is the default. It uses the same retrieval and policy precheck, then formats the retrieved evidence into a reproducible answer.
 
 Set `AGENTMATRIX_MODE=langchain` and configure `AGENTMATRIX_MODEL` only when a supported LangChain provider is intentionally available.
 
@@ -69,7 +56,9 @@ pip install -e '.[dev]'
 uvicorn agentmatrix.api:app --reload
 ```
 
-Then:
+Open [the research workspace](http://127.0.0.1:8000/) to run a question and review the
+answer, evidence, and trace. [Interactive API documentation](http://127.0.0.1:8000/docs)
+is also available. To call the API directly:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/agent/run \
@@ -93,16 +82,7 @@ The server contains read-only knowledge search and a guarded action proposal too
 python scripts/evaluate.py
 ```
 
-The evaluator reads `evals/golden.jsonl` and writes `evaluation.json`. Current checks are deterministic contract tests—not fabricated LLM-quality scores.
-
-Tracked metrics include:
-
-- task completion contract
-- expected evidence coverage
-- tool-selection correctness
-- approval-policy correctness
-- citation/evidence-ID presence
-- latency and tool-call count
+The evaluator reads `evals/golden.jsonl` and writes `evaluation.json`. Each deterministic case checks expected evidence ID coverage and the value of the API's approval field. These cases measure the response contract. Ollama answer quality and tool selection require separate evaluation.
 
 Future provider-backed releases can extend this with groundedness, faithfulness, retrieval Recall@K/MRR/NDCG, trajectory grading, and cost regression.
 
@@ -130,7 +110,7 @@ src/agentmatrix/
   api.py            FastAPI service
   config.py         runtime settings
   graph.py          LangGraph orchestration
-  model.py          deterministic + LangChain model adapter
+  model.py          deterministic, Ollama, and LangChain modes
   policy.py         tool/action policy gates
   retrieval.py      evidence retrieval contract
   state.py          graph state types
@@ -161,8 +141,10 @@ tests/              policy/retrieval/API-contract tests
 | LangGraph graph | Implemented |
 | LangChain provider adapter | Implemented, provider opt-in |
 | MCP v2 typed tool server | Implemented |
-| Read-only retrieval | Implemented |
-| Write-action approval boundary | Implemented |
+| Keyword retrieval and Ollama synthesis | Implemented for three sample policies |
+| Write-action approval | MCP proposal flag |
+| Tool execution and approval resume in web demo | Unimplemented |
+| Hybrid retrieval and PII handling | Unimplemented |
 | Offline evaluation contract | Implemented |
 | FastAPI service | Implemented |
 | Docker packaging | Implemented |
@@ -176,7 +158,7 @@ tests/              policy/retrieval/API-contract tests
 
 ## Technology signal
 
-**LangGraph · LangChain · MCP · Agentic RAG · FastAPI · Pydantic · Docker · CI/CD · Evaluation · Guardrails · Human-in-the-loop · Observability · Responsible AI**
+**LangGraph · Ollama · LangChain · MCP · Keyword RAG · FastAPI · Pydantic · Docker · CI · Evaluation · Run traces**
 
 ## License
 

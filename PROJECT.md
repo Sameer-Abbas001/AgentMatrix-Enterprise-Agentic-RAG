@@ -10,12 +10,12 @@ Build a reproducible reference platform for auditable LLM agents that can retrie
 
 ## Current delivered scope
 
-- LangGraph orchestration with deterministic default execution
+- LangGraph orchestration with deterministic default execution and an Ollama mode
 - LangChain provider adapter for opt-in model execution
 - MCP v2 typed tool server
-- retrieval and evidence scoring contract
+- keyword retrieval and scoring over three sample policies
 - prompt-injection and policy checks
-- approval boundary for write-like actions
+- standalone MCP action proposals with an approval flag for write-like actions
 - FastAPI service contract
 - evaluation harness and golden cases
 - structured tracing and latency fields
@@ -28,7 +28,7 @@ Build a reproducible reference platform for auditable LLM agents that can retrie
 ### Phase 1 — Platform foundation — COMPLETE
 - [x] State-machine orchestration
 - [x] MCP tool boundary
-- [x] policy and approval controls
+- [x] policy precheck and action proposal approval flag
 - [x] API contract
 - [x] deterministic evaluation
 - [x] container and CI pipeline
@@ -38,6 +38,7 @@ Build a reproducible reference platform for auditable LLM agents that can retrie
 - [ ] Add OpenTelemetry/LangSmith-compatible distributed traces
 - [ ] Add hybrid vector retrieval and reranking
 - [ ] Expand MCP registry to multiple enterprise tools
+- [ ] Integrate tool execution and resumable human approval into the web workflow
 - [ ] Add adversarial prompt-injection benchmark
 - [ ] Measure groundedness, trajectory quality, latency, token usage and cost
 

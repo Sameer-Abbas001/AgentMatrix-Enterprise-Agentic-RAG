@@ -6,15 +6,15 @@ AgentMatrix uses LangGraph as the workflow runtime because enterprise agent syst
 
 ## Model plane
 
-The default deterministic synthesizer exists for reproducibility and CI. The LangChain adapter is opt-in. A production implementation should add dynamic model routing based on task complexity, privacy, latency, and cost budgets.
+The default deterministic synthesizer exists for reproducibility and CI. Ollama generates answers using the retrieved excerpts in the EC2 demo. The LangChain adapter is opt-in.
 
 ## Tool plane
 
-MCP is the interoperability boundary. Read tools can run automatically when authorized. Side-effecting tools must be allowlisted and should pause for human approval before execution.
+The standalone MCP server exposes knowledge search and guarded action proposals. Proposals report the allowlist decision and whether explicit approval is required. The FastAPI Q&A graph runs independently of MCP.
 
 ## Evidence plane
 
-The included lexical retriever is intentionally small and deterministic. A production release can swap in hybrid BM25 + dense retrieval + reranking while preserving the `Evidence` contract and evaluation interface.
+The lexical retriever searches three bundled policy documents. Scores are the share of distinct query terms that match a document after removing common words. It keeps the strongest matches for synthesis and returns an evidence gap when no terms match. Hybrid retrieval can be added behind the same `Evidence` contract.
 
 ## Evaluation plane
 

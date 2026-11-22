@@ -15,7 +15,7 @@ This statement records the author's implementation history. It does not by itsel
 | Implementation | Source, tests, deterministic evaluation, FastAPI, Docker, MCP server and CI are present in this repository. | Repository-verifiable |
 | Execution | The author reports real-world execution in institutional research and healthcare-support contexts. | Author-confirmed; supporting run records should be linked when publishable |
 | Measured result | The tracked baseline currently contains 3/3 passing deterministic contract cases. | Repository-verifiable; not an LLM-quality benchmark |
-| Deployment | A recruiter-facing Hugging Face surface is linked from the README. | Public surface; production-cloud operation is not claimed |
+| Deployment | The repository includes an EC2 deployment guide and an optional static Hugging Face Space bundle. | Repository-verifiable |
 | Ownership | Architecture and implementation were completed by Sameer Abbas. | Author-confirmed |
 
 ## Engineering background and context

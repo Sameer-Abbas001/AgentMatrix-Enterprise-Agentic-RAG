@@ -50,7 +50,7 @@ security group permits no inbound connections. On the AWS Free account plan, eli
 uses your credits until the plan expires. The [AWS Pricing Calculator](https://calculator.aws/)
 can estimate credit usage for your region and instance type.
 
-## Open the API
+## Open the AgentMatrix workspace
 
 **From a browser with access to AWS:** Open the instance in the EC2 console in the deployment
 region and select **Connect → Session Manager → Connect**. Run the following from the
@@ -66,11 +66,12 @@ curl --fail-with-body http://127.0.0.1:8000/v1/agent/run \
 A successful response shows `"mode":"ollama"`, an answer, and retrieved evidence. The
 browser terminal can close while both services continue running.
 
-**To open the interactive API docs on your device:** Run the port-forwarding command printed
+**To open the research workspace on your device:** Run the port-forwarding command printed
 by the deploy script on a device with authenticated AWS CLI and the
 [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html).
-Use [the API docs](http://127.0.0.1:8000/docs) while the tunnel is open. The address
-belongs to the tunnel on your device, and the inference runs on EC2.
+Use [the research workspace](http://127.0.0.1:8000/) while the tunnel is open. The address
+belongs to the tunnel on your device, and the inference runs on EC2. The workspace links to
+[the API docs](http://127.0.0.1:8000/docs).
 For two testers, each can open their own tunnel with their own authorized AWS identity.
 
 ## Operating the stack

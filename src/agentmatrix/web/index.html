@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>AgentMatrix · Research workspace</title>
+  <meta name="description" content="Ask AgentMatrix a question and inspect the evidence behind its answer.">
+  <link rel="stylesheet" href="/assets/workspace.css">
+  <script src="/assets/workspace.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#question">Skip to question</a>
+  <header class="topbar">
+    <div class="page topbar-inner">
+      <a class="brand" href="/" aria-label="AgentMatrix home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span>Agent<span class="brand-accent">Matrix</span></span>
+      </a>
+      <div class="topbar-actions">
+        <span class="service-status" id="service-status" data-state="checking" role="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="service-label">Checking model</span>
+        </span>
+        <a class="docs-link" href="/docs">API docs</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span> Research workspace</p>
+        <h1 id="page-title">Ask AgentMatrix</h1>
+        <p>Ask a question across three sample policies, then inspect the excerpts used to answer it.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="field"></div>
+        <div class="ring ring-outer"></div>
+        <div class="ring ring-middle"></div>
+        <div class="ring ring-inner"></div>
+        <div class="art-node node-a"></div>
+        <div class="art-node node-b"></div>
+        <div class="art-node node-c"></div>
+        <div class="art-core"><i></i><i></i><i></i><i></i></div>
+      </div>
+    </section>
+
+    <section class="examples" aria-labelledby="examples-heading">
+      <h2 id="examples-heading">Try an example</h2>
+      <div class="example-grid">
+        <button class="example" type="button" data-question="What changes require approval under the incident response policy?">
+          <span class="example-icon icon-shield" aria-hidden="true"></span>
+          <span><strong>Incident response</strong><span>When is approval required?</span></span>
+        </button>
+        <button class="example" type="button" data-question="Which agent tools are read-only, and which actions count as writes?">
+          <span class="example-icon icon-tools" aria-hidden="true"></span>
+          <span><strong>Tool permissions</strong><span>Which actions count as writes?</span></span>
+        </button>
+        <button class="example" type="button" data-question="What evidence should an agent cite, and how should it report benchmarks?">
+          <span class="example-icon icon-pages" aria-hidden="true"></span>
+          <span><strong>Evidence standards</strong><span>How should answers cite sources?</span></span>
+        </button>
+      </div>
+    </section>
+
+    <div class="workspace">
+      <div class="primary-column">
+        <section class="panel composer" aria-labelledby="question-heading">
+          <form id="question-form">
+            <h2 id="question-heading"><label for="question">Your question</label></h2>
+            <textarea id="question" name="question" rows="3" required minlength="3" maxlength="8000"
+              placeholder="Ask about incident response, tool permissions, or evidence…"
+              aria-describedby="question-help"></textarea>
+            <div class="composer-footer">
+              <p id="question-help" class="keyboard-hint"><kbd>Ctrl</kbd> <kbd>Enter</kbd> to run</p>
+              <button class="run-button" type="submit" id="run-button">
+                <span class="run-icon" aria-hidden="true"></span>
+                <span id="run-label">Run agent</span>
+              </button>
+            </div>
+          </form>
+          <noscript><p class="inline-error">Enable JavaScript to run questions here, or use the API docs.</p></noscript>
+        </section>
+
+        <section class="panel answer-panel" aria-labelledby="answer-heading" id="answer-panel" aria-busy="false">
+          <div class="panel-heading">
+            <h2 id="answer-heading">Answer</h2>
+            <button type="button" class="copy-button" id="copy-answer" hidden>Copy answer</button>
+          </div>
+          <div class="empty-answer" id="empty-answer">
+            <span class="empty-icon" aria-hidden="true"><i></i></span>
+            <p>Your answer will appear here.</p>
+          </div>
+          <div class="loading" id="loading" hidden>
+            <span class="loading-dot" aria-hidden="true"></span>
+            <div><strong>Generating your answer</strong><p>The model can take a few seconds on AWS.</p></div>
+            <span class="elapsed" id="elapsed" aria-hidden="true">0 s</span>
+          </div>
+          <p id="run-error" class="inline-error" role="alert" hidden></p>
+          <div class="answer-text" id="answer-text" tabindex="-1" hidden></div>
+          <p class="sr-only" id="announcement" role="status"></p>
+        </section>
+      </div>
+
+      <aside class="panel side-panel" aria-labelledby="sources-heading">
+        <div class="panel-heading">
+          <h2 id="sources-heading">Retrieved evidence</h2>
+          <span id="source-count" class="source-count" hidden></span>
+        </div>
+        <p class="evidence-method">Scores show the share of search terms found in each source.</p>
+        <div id="source-list" class="source-list">
+          <p class="side-empty">Run a question to see matching policies and their excerpts.</p>
+        </div>
+        <details class="run-details" id="run-details" hidden>
+          <summary>Run details</summary>
+          <dl>
+            <div><dt>Provider</dt><dd id="run-provider"></dd></div>
+            <div><dt>Latency</dt><dd id="run-latency"></dd></div>
+            <div><dt>Policy check</dt><dd id="run-policy"></dd></div>
+            <div><dt>Trace ID</dt><dd id="run-trace"></dd></div>
+          </dl>
+        </details>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>

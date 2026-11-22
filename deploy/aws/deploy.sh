@@ -115,4 +115,4 @@ fi
 printf 'EC2 instance: %s (%s)\n' "$instance" "$region"
 printf 'Open a private tunnel from a machine with the AWS CLI and Session Manager plugin:\n'
 printf "aws ssm start-session --region %s --target %s --document-name AWS-StartPortForwardingSession --parameters 'portNumber=8000,localPortNumber=8000'\n" "$region" "$instance"
-printf 'API docs during the session: http://127.0.0.1:8000/docs\n'
+printf 'AgentMatrix workspace during the session: http://127.0.0.1:8000/\n'
