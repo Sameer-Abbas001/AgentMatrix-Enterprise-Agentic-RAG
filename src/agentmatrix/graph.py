@@ -3,7 +3,7 @@ from __future__ import annotations
 from langgraph.graph import END, START, StateGraph
 
 from agentmatrix.config import Settings
-from agentmatrix.model import deterministic_synthesis, langchain_synthesis
+from agentmatrix.model import deterministic_synthesis, langchain_synthesis, ollama_synthesis
 from agentmatrix.policy import contains_injection_pattern
 from agentmatrix.retrieval import retrieve
 from agentmatrix.state import AgentState
@@ -32,6 +32,8 @@ def build_graph(settings: Settings):
         evidence = state.get("evidence", [])
         if settings.mode == "langchain":
             answer = langchain_synthesis(state["task"], evidence, settings.model)
+        elif settings.mode == "ollama":
+            answer = ollama_synthesis(state["task"], evidence, settings)
         else:
             answer = deterministic_synthesis(state["task"], evidence)
         return {"answer": answer}

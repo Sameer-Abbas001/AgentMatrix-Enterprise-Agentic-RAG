@@ -1,0 +1,227 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Private AgentMatrix and Ollama services on a single Amazon EC2 instance.
+
+Parameters:
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+  ImageId:
+    Type: AWS::EC2::Image::Id
+  RootDevice:
+    Type: String
+    AllowedPattern: "/dev/[a-z0-9]+"
+  InstanceType:
+    Type: String
+    AllowedValues: [m7i-flex.large, m7i.xlarge, g4dn.xlarge]
+  ArtifactBucket:
+    Type: String
+    AllowedPattern: "[a-z0-9-]+"
+  ArtifactSha256:
+    Type: String
+    AllowedPattern: "[a-f0-9]{64}"
+  OllamaModel:
+    Type: String
+    Default: "qwen2.5:7b"
+    AllowedPattern: "[a-zA-Z0-9._/:-]+"
+    MaxLength: 128
+
+Conditions:
+  UseGpu: !Equals [!Ref InstanceType, g4dn.xlarge]
+  UseTestInstance: !Equals [!Ref InstanceType, m7i-flex.large]
+  UseInstanceGroup: !Not [!Condition UseTestInstance]
+
+Resources:
+  Network:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.73.0.0/24
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Network
+      CidrBlock: 10.73.0.0/26
+      AvailabilityZone: !Ref AvailabilityZone
+  Gateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Network
+      InternetGatewayId: !Ref Gateway
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Network
+  OutboundRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref Gateway
+  SubnetRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Subnet
+      RouteTableId: !Ref RouteTable
+  InstanceFirewall:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Outbound HTTPS for AWS management and dependency downloads.
+      VpcId: !Ref Network
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub "ec2.${AWS::URLSuffix}"
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      Policies:
+        - PolicyName: FetchReleaseAndSignal
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${ArtifactBucket}/agentmatrix/${AWS::StackName}/*"
+              - Effect: Allow
+                Action: cloudformation:SignalResource
+                Resource: !Ref AWS::StackId
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+  Machine:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref ImageId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile:
+          Arn: !GetAtt InstanceProfile.Arn
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: true
+            DeleteOnTermination: true
+            Groups: [!Ref InstanceFirewall]
+            SubnetId: !If [UseTestInstance, !Ref Subnet, !Ref AWS::NoValue]
+        BlockDeviceMappings:
+          - DeviceName: !Ref RootDevice
+            Ebs:
+              VolumeSize: !If [UseTestInstance, 40, 80]
+              VolumeType: gp3
+              Encrypted: true
+              DeleteOnTermination: true
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euo pipefail
+            install -d -m 0755 /opt/agentmatrix
+            if [ '${InstanceType}' != m7i-flex.large ]; then
+              systemctl mask --now ecs.service
+            fi
+            cat > /opt/agentmatrix/initialize <<'INIT'
+            #!/bin/bash
+            set -euo pipefail
+            export AWS_DEFAULT_REGION='${AWS::Region}'
+            export AWS_RETRY_MODE=standard AWS_MAX_ATTEMPTS=8
+            metadata='http://169.254.169.254/latest'
+            token=$(curl --noproxy '*' -fsS --retry 5 --max-time 5 -X PUT \
+              -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' "$metadata/api/token")
+            instance=$(curl --noproxy '*' -fsS --retry 5 --max-time 5 \
+              -H "X-aws-ec2-metadata-token: $token" "$metadata/meta-data/instance-id")
+            resource=InstanceGroup
+            if [ '${InstanceType}' = m7i-flex.large ]; then resource=TestInstance; fi
+            signal_stack() {
+              status=FAILURE
+              if [ "$1" -eq 0 ]; then status=SUCCESS; fi
+              aws cloudformation signal-resource --stack-name '${AWS::StackId}' \
+                --logical-resource-id "$resource" --unique-id "$instance" --status "$status"
+            }
+            trap 'signal_stack "$?" || echo "CloudFormation did not accept the bootstrap signal."' EXIT
+            rpm -q amazon-ssm-agent >/dev/null || dnf install -y amazon-ssm-agent
+            systemctl enable --now amazon-ssm-agent.service
+            rpm -q docker >/dev/null || dnf install -y docker
+            systemctl enable --now docker.service
+            sha='${ArtifactSha256}'
+            aws s3 cp --only-show-errors \
+              "s3://${ArtifactBucket}/agentmatrix/${AWS::StackName}/$sha.tar.gz" release.tar.gz
+            printf '%s  release.tar.gz\n' "$sha" | sha256sum --check
+            tar -xzf release.tar.gz
+            bash deploy/aws/bootstrap.sh '${InstanceType}' '${OllamaModel}'
+            INIT
+            chmod 0755 /opt/agentmatrix/initialize
+            systemd-run --no-block --unit=agentmatrix-bootstrap \
+              --property=After=cloud-final.service \
+              --property=WorkingDirectory=/opt/agentmatrix \
+              /opt/agentmatrix/initialize
+  TestInstance:
+    Type: AWS::EC2::Instance
+    Condition: UseTestInstance
+    DependsOn: [OutboundRoute, SubnetRoutes]
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref Machine
+        Version: !GetAtt Machine.LatestVersionNumber
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+  InstanceGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Condition: UseInstanceGroup
+    DependsOn: [OutboundRoute, SubnetRoutes]
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT30M
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MaxBatchSize: 1
+        MinInstancesInService: 0
+        MinSuccessfulInstancesPercent: 100
+        PauseTime: PT30M
+        WaitOnResourceSignals: true
+        SuspendProcesses: [HealthCheck, ReplaceUnhealthy, AZRebalance, InstanceRefresh]
+    Properties:
+      MinSize: "1"
+      MaxSize: "2"
+      DesiredCapacity: "1"
+      VPCZoneIdentifier: [!Ref Subnet]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref Machine
+        Version: !GetAtt Machine.LatestVersionNumber
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+          PropagateAtLaunch: true
+
+Outputs:
+  TestInstanceId:
+    Condition: UseTestInstance
+    Value: !Ref TestInstance
+  AutoScalingGroupName:
+    Condition: UseInstanceGroup
+    Value: !Ref InstanceGroup
+  Model:
+    Value: !Ref OllamaModel
+  Compute:
+    Value: !If [UseGpu, "NVIDIA GPU", CPU]

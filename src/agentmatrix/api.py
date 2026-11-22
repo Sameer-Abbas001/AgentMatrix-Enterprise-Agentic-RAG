@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+import httpx
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from agentmatrix.config import get_settings
 from agentmatrix.graph import build_graph
+from agentmatrix.model import OllamaError, ollama_model_ready
 from agentmatrix.observability import Trace
 
 app = FastAPI(title="AgentMatrix Enterprise", version="0.1.0")
@@ -20,23 +22,44 @@ def health() -> dict:
     return {"status": "ok", "mode": get_settings().mode}
 
 
+@app.get("/ready")
+def ready() -> dict:
+    settings = get_settings()
+    if settings.mode != "ollama":
+        return {"status": "ready", "mode": settings.mode}
+    try:
+        ollama_model_ready(settings)
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="Ollama model is unavailable.") from exc
+    return {"status": "ready", "mode": settings.mode, "model": settings.ollama_model}
+
+
 @app.post("/v1/agent/run")
 def run_agent(request: RunRequest) -> dict:
     settings = get_settings()
     trace = Trace()
     graph = build_graph(settings)
-    result = graph.invoke(
-        {
-            "task": request.task,
-            "trace_id": trace.trace_id,
-            "evidence": [],
-            "tool_calls": [],
-            "policy_events": [],
-            "requires_approval": False,
-            "approved": request.approved,
-            "answer": "",
-        }
-    )
+    try:
+        result = graph.invoke(
+            {
+                "task": request.task,
+                "trace_id": trace.trace_id,
+                "evidence": [],
+                "tool_calls": [],
+                "policy_events": [],
+                "requires_approval": False,
+                "approved": request.approved,
+                "answer": "",
+            }
+        )
+    except httpx.TimeoutException as exc:
+        if settings.mode != "ollama":
+            raise
+        raise HTTPException(status_code=504, detail="Ollama took too long to respond.") from exc
+    except (httpx.HTTPError, OllamaError) as exc:
+        if settings.mode != "ollama":
+            raise
+        raise HTTPException(status_code=502, detail="Ollama could not generate an answer.") from exc
     return {
         "trace_id": trace.trace_id,
         "status": "completed",

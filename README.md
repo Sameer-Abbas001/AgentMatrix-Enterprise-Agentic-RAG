@@ -56,6 +56,10 @@ Retriever       MCP registry    Human decision
 
 Set `AGENTMATRIX_MODE=langchain` and configure `AGENTMATRIX_MODEL` only when a supported LangChain provider is intentionally available.
 
+Set `AGENTMATRIX_MODE=ollama` to generate answers with a model served by Ollama. For AWS, see the
+[deployment guide](deploy/aws/README.md). It runs FastAPI and Ollama together on EC2, with the
+API available through AWS Systems Manager Session Manager.
+
 ## Quick start
 
 ```bash
