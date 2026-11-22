@@ -17,9 +17,32 @@ const announcement = document.querySelector("#announcement");
 const sourceCount = document.querySelector("#source-count");
 const sourceList = document.querySelector("#source-list");
 const runDetails = document.querySelector("#run-details");
+const addPolicies = document.querySelector("#add-policies");
+const policyFiles = document.querySelector("#policy-files");
+const policyList = document.querySelector("#policy-list");
+const policyScope = document.querySelector("#policy-scope");
+const policyError = document.querySelector("#policy-error");
+const examples = document.querySelector("#examples");
 const sourceCards = new Map();
+const policyStorageKey = "agentmatrix.policies.v1";
+const maxPolicies = 8;
+const maxPolicyFileBytes = 2 * 1024 * 1024;
 
 let currentAnswer = "";
+let policies = readPolicies();
+
+function readPolicies() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(policyStorageKey) || "[]");
+    if (Array.isArray(saved)) {
+      return saved.filter((policy) => typeof policy?.title === "string" && typeof policy.text === "string")
+        .slice(0, maxPolicies);
+    }
+  } catch {
+    // Storage can be unavailable in some browser configurations.
+  }
+  return [];
+}
 
 function providerLabel(mode) {
   return { ollama: "Ollama", deterministic: "Deterministic mode", langchain: "LangChain" }[mode] || "AgentMatrix";
@@ -46,6 +69,106 @@ function textElement(tag, value, className) {
   if (className) element.className = className;
   return element;
 }
+
+function setBusy(busy) {
+  runButton.disabled = busy;
+  addPolicies.disabled = busy || policies.length >= maxPolicies;
+  policyList.querySelectorAll("button").forEach((button) => { button.disabled = busy; });
+}
+
+function renderPolicies() {
+  const count = policies.length;
+  policyScope.textContent = count
+    ? `Searching ${count} uploaded ${count === 1 ? "policy" : "policies"} in this tab.`
+    : "Searching the three sample policies.";
+  examples.hidden = count > 0;
+  question.placeholder = count
+    ? "Ask a question about your uploaded policies…"
+    : "Ask about incident response, tool permissions, or evidence…";
+  policyList.hidden = count === 0;
+  policyList.replaceChildren();
+  policies.forEach((policy, index) => {
+    const item = document.createElement("li");
+    const remove = textElement("button", "Remove", "remove-policy");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `Remove ${policy.title}`);
+    remove.addEventListener("click", () => {
+      policies.splice(index, 1);
+      savePolicies([]);
+      (policyList.querySelectorAll("button")[index] || addPolicies).focus();
+    });
+    item.append(textElement("span", policy.title), remove);
+    policyList.append(item);
+  });
+  setBusy(false);
+}
+
+function showPolicyErrors(messages) {
+  policyError.textContent = messages.join("\n");
+  policyError.hidden = !messages.length;
+}
+
+function savePolicies(errors) {
+  try {
+    if (policies.length) sessionStorage.setItem(policyStorageKey, JSON.stringify(policies));
+    else sessionStorage.removeItem(policyStorageKey);
+  } catch {
+    errors.push("Your policies are ready to search. Upload them again after refreshing this page.");
+  }
+  renderPolicies();
+  showPolicyErrors(errors);
+  resetRun();
+  renderSources([], "Run a question to see matching policies and their excerpts.");
+}
+
+addPolicies.addEventListener("click", () => policyFiles.click());
+policyFiles.addEventListener("change", async () => {
+  const files = Array.from(policyFiles.files);
+  policyFiles.value = "";
+  if (!files.length) return;
+
+  setBusy(true);
+  policyScope.textContent = "Reading your policy files…";
+  showPolicyErrors([]);
+  const errors = [];
+  const previousCount = policies.length;
+  for (const file of files) {
+    if (policies.length >= maxPolicies) {
+      errors.push("The library can hold up to 8 files. Remove a policy to add another.");
+      break;
+    }
+    if (file.size > maxPolicyFileBytes) {
+      errors.push(`${file.name} — Choose a file up to 2 MB.`);
+      continue;
+    }
+    try {
+      const url = `/v1/policies/extract?${new URLSearchParams({ filename: file.name })}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: file,
+        signal: AbortSignal.timeout(30000),
+      });
+      const extracted = await response.json().catch(() => null);
+      if (!response.ok || !extracted?.text) {
+        throw new Error(typeof extracted?.detail === "string" ? extracted.detail : "Could not read this file.");
+      }
+      if (policies.some((policy) => policy.title === extracted.title && policy.text === extracted.text)) {
+        errors.push(`${file.name} — Already in this library.`);
+        continue;
+      }
+      policies.push(extracted);
+    } catch (error) {
+      errors.push(`${file.name} — ${error.message}`);
+    }
+  }
+  if (policies.length > previousCount) {
+    savePolicies(errors);
+  } else {
+    renderPolicies();
+    showPolicyErrors(errors);
+  }
+});
 
 function renderSources(evidence = [], message = "No matching policy sources were found.") {
   sourceCards.clear();
@@ -86,14 +209,16 @@ function renderSources(evidence = [], message = "No matching policy sources were
 }
 
 function appendInline(container, text) {
-  const spans = text.split(/(\*\*[^*\n]+\*\*|\[kb-\d+\])/gi);
+  const spans = text.split(/(\*\*[^*\n]+\*\*|\[(?:kb-\d+|policy-\d+-\d+)\])/gi);
   for (const span of spans) {
     if (span.startsWith("**") && span.endsWith("**")) {
-      container.append(textElement("strong", span.slice(2, -2)));
+      const strong = document.createElement("strong");
+      appendInline(strong, span.slice(2, -2));
+      container.append(strong);
       continue;
     }
 
-    const id = span.match(/^\[(kb-\d+)\]$/i)?.[1];
+    const id = span.match(/^\[((?:kb-\d+|policy-\d+-\d+))\]$/i)?.[1];
     const card = id && sourceCards.get(id.toLowerCase());
     if (card) {
       const citation = textElement("button", id, "citation");
@@ -166,6 +291,19 @@ question.addEventListener("keydown", (event) => {
   }
 });
 
+function resetRun() {
+  currentAnswer = "";
+  copyAnswer.hidden = true;
+  copyAnswer.textContent = "Copy answer";
+  answerText.replaceChildren();
+  answerText.hidden = true;
+  emptyAnswer.hidden = false;
+  runError.hidden = true;
+  runDetails.hidden = true;
+  runDetails.open = false;
+  announcement.textContent = "";
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (runButton.disabled) return;
@@ -176,16 +314,10 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
-  currentAnswer = "";
-  copyAnswer.hidden = true;
-  copyAnswer.textContent = "Copy answer";
-  answerText.hidden = true;
+  resetRun();
   emptyAnswer.hidden = true;
-  runError.hidden = true;
-  runDetails.hidden = true;
-  runDetails.open = false;
   renderSources([], "Waiting for the sources from this run.");
-  runButton.disabled = true;
+  setBusy(true);
   runLabel.textContent = "Running…";
   loading.hidden = false;
   answerPanel.setAttribute("aria-busy", "true");
@@ -200,7 +332,7 @@ form.addEventListener("submit", async (event) => {
     const response = await fetch("/v1/agent/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task }),
+      body: JSON.stringify({ task, policies }),
       signal: AbortSignal.timeout(200000),
     });
     if (response.status === 401) {
@@ -232,7 +364,7 @@ form.addEventListener("submit", async (event) => {
   } finally {
     clearInterval(clock);
     loading.hidden = true;
-    runButton.disabled = false;
+    setBusy(false);
     runLabel.textContent = "Run agent";
     answerPanel.setAttribute("aria-busy", "false");
   }
@@ -250,4 +382,5 @@ copyAnswer.addEventListener("click", async () => {
   }
 });
 
+renderPolicies();
 refreshServiceStatus();

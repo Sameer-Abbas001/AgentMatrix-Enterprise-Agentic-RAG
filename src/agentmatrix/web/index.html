@@ -6,8 +6,8 @@
   <meta name="color-scheme" content="light">
   <title>AgentMatrix · Research workspace</title>
   <meta name="description" content="Ask AgentMatrix a question and inspect the evidence behind its answer.">
-  <link rel="stylesheet" href="/assets/workspace.css">
-  <script src="/assets/workspace.js" defer></script>
+  <link rel="stylesheet" href="/assets/workspace.css?v=policies">
+  <script src="/assets/workspace.js?v=policies" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#question">Skip to question</a>
@@ -32,7 +32,7 @@
       <div class="hero-copy">
         <p class="eyebrow"><span></span> Research workspace</p>
         <h1 id="page-title">Ask AgentMatrix</h1>
-        <p>Ask a question across three sample policies, then inspect the excerpts used to answer it.</p>
+        <p>Ask a question about the sample policies or add your own. See the excerpts behind each answer.</p>
       </div>
       <div class="hero-art" aria-hidden="true">
         <div class="field"></div>
@@ -46,7 +46,21 @@
       </div>
     </section>
 
-    <section class="examples" aria-labelledby="examples-heading">
+    <section class="panel policy-library" aria-labelledby="policy-heading">
+      <div class="panel-heading">
+        <h2 id="policy-heading">Policy library</h2>
+        <button class="add-policies" id="add-policies" type="button" aria-describedby="policy-help">
+          <span aria-hidden="true">+</span> Add policies
+        </button>
+        <input id="policy-files" type="file" accept=".pdf,.docx,.txt,.md" multiple hidden>
+      </div>
+      <p class="policy-scope" id="policy-scope" role="status">Searching the three sample policies.</p>
+      <ul class="policy-list" id="policy-list" aria-label="Uploaded policies" hidden></ul>
+      <p class="policy-help" id="policy-help">PDF with selectable text, DOCX, TXT, or MD. Up to 8 files, 2 MB each.</p>
+      <p class="inline-error" id="policy-error" role="alert" hidden></p>
+    </section>
+
+    <section class="examples" id="examples" aria-labelledby="examples-heading">
       <h2 id="examples-heading">Try an example</h2>
       <div class="example-grid">
         <button class="example" type="button" data-question="What changes require approval under the incident response policy?">

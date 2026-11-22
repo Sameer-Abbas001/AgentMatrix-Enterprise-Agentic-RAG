@@ -5,11 +5,11 @@ from langgraph.graph import END, START, StateGraph
 from agentmatrix.config import Settings
 from agentmatrix.model import deterministic_synthesis, langchain_synthesis, ollama_synthesis
 from agentmatrix.policy import contains_injection_pattern
-from agentmatrix.retrieval import retrieve
+from agentmatrix.retrieval import Document, retrieve
 from agentmatrix.state import AgentState
 
 
-def build_graph(settings: Settings):
+def build_graph(settings: Settings, *, documents: list[Document] | None = None):
     def precheck(state: AgentState) -> dict:
         events = list(state.get("policy_events", []))
         if contains_injection_pattern(state["task"]):
@@ -24,7 +24,7 @@ def build_graph(settings: Settings):
     def research(state: AgentState) -> dict:
         if state.get("answer"):
             return {}
-        return {"evidence": retrieve(state["task"], top_k=3)}
+        return {"evidence": retrieve(state["task"], top_k=3, documents=documents)}
 
     def synthesize(state: AgentState) -> dict:
         if state.get("answer"):

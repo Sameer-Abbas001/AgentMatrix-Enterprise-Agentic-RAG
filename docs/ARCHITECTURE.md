@@ -14,7 +14,12 @@ The standalone MCP server exposes knowledge search and guarded action proposals.
 
 ## Evidence plane
 
-The lexical retriever searches three bundled policy documents. Scores are the share of distinct query terms that match a document after removing common words. It keeps the strongest matches for synthesis and returns an evidence gap when no terms match. Hybrid retrieval can be added behind the same `Evidence` contract.
+The lexical retriever searches the three bundled policies by default. The web workspace
+can extract text from uploaded files, keep it in the current browser tab, and send it
+with each run. The API splits uploaded text into overlapping passages before retrieval.
+Scores measure the share of distinct query terms that match after removing common words.
+The graph keeps the strongest matches for synthesis and returns an evidence gap when no
+terms match. Hybrid retrieval can be added behind the same `Evidence` contract.
 
 ## Evaluation plane
 

@@ -4,13 +4,13 @@
 
 > Portfolio project by **Sameer Abbas**.
 
-AgentMatrix Enterprise answers questions over three sample policy documents. It ranks evidence by keyword overlap and sends relevant excerpts to Ollama in the AWS demo. The interviewer workspace shows the answer, retrieved excerpts, match scores, and execution trace. A deterministic mode supports local development and CI without a model API key.
+AgentMatrix Enterprise answers questions over sample policies or files added to the interviewer workspace. It ranks evidence by keyword overlap and sends relevant excerpts to Ollama in the AWS demo. The workspace shows the answer, retrieved excerpts, match scores, and execution trace. A deterministic mode supports local development and CI without a model API key.
 
 ## Project capabilities
 
 - **LangGraph** runs the policy precheck, evidence retrieval, and answer synthesis.
 - **Ollama** generates answers on EC2. A separate opt-in **LangChain** adapter supports other providers.
-- **Keyword retrieval** ranks the sample policies by the share of meaningful query terms they match. Context includes the highest-ranked sources and any others that match at least half as many terms. Queries with zero matches return an evidence gap before generation.
+- **Keyword retrieval** ranks policy passages by the share of meaningful query terms they match. Context includes the strongest passages and any others that match at least half as many terms, up to three total. Queries with zero matches return an evidence gap before generation.
 - **MCP v2** exposes typed knowledge search and action proposal tools over stdio. The proposal tool checks an allowlist and flags write actions for explicit approval.
 - **Policy prechecks** detect known prompt-injection phrases.
 - **Run traces** include evidence IDs, policy events, and latency. The API response includes a tool-call field for integrations.
@@ -66,6 +66,14 @@ curl -X POST http://127.0.0.1:8000/v1/agent/run \
   -d '{"task":"Summarize the incident-response policy and identify actions that require approval."}'
 ```
 
+Select **Add policies** to search your own files. The workspace accepts up to eight
+text-based PDF, DOCX, TXT, or Markdown files, each up to 2 MB and 40,000 extracted characters.
+PDF files can contain up to 25 pages. Scanned PDFs need a text layer.
+The current browser tab keeps the extracted text through refreshes and sends it with
+each question. Remove all uploaded policies to use the three samples again.
+API callers can pass the extracted `title` and `text` entries as a `policies` array
+in the run request.
+
 ## MCP server
 
 The project targets the **MCP Python SDK v2** and exposes a minimal typed server:
@@ -109,6 +117,7 @@ Every run returns a structured envelope:
 src/agentmatrix/
   api.py            FastAPI service
   config.py         runtime settings
+  documents.py      file extraction and passage splitting
   graph.py          LangGraph orchestration
   model.py          deterministic, Ollama, and LangChain modes
   policy.py         tool/action policy gates
@@ -141,7 +150,7 @@ tests/              policy/retrieval/API-contract tests
 | LangGraph graph | Implemented |
 | LangChain provider adapter | Implemented, provider opt-in |
 | MCP v2 typed tool server | Implemented |
-| Keyword retrieval and Ollama synthesis | Implemented for three sample policies |
+| Keyword retrieval and Ollama synthesis | Sample policies and uploaded documents |
 | Write-action approval | MCP proposal flag |
 | Tool execution and approval resume in web demo | Unimplemented |
 | Hybrid retrieval and PII handling | Unimplemented |

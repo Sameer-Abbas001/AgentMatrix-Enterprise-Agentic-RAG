@@ -37,6 +37,39 @@ def test_run_sends_retrieved_evidence_to_ollama(ollama_api, monkeypatch):
     assert response.json()["answer"] == "Production changes require approval [kb-001]."
 
 
+def test_run_sends_only_relevant_uploaded_passages_to_ollama(ollama_api, monkeypatch):
+    remote_rule = "Employees can work remotely up to two days per week."
+
+    def chat(url, *, json, **kwargs):
+        prompt = json["messages"][1]["content"]
+        assert "[policy-2-3] remote-work.txt" in prompt
+        assert remote_rule in prompt
+        assert "meal reimbursement" not in prompt
+        assert "kb-001" not in prompt
+        return httpx.Response(
+            200,
+            json={"message": {"content": "Two days per week [policy-2-3]."}},
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx, "post", chat)
+    response = ollama_api.post(
+        "/v1/agent/run",
+        json={
+            "task": "How many days per week can employees work remotely?",
+            "policies": [
+                {"title": "expenses.txt", "text": "The meal reimbursement limit is $25."},
+                {"title": "remote-work.txt", "text": "Preface " * 330 + remote_rule},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    evidence = response.json()["evidence"]
+    assert [item["id"] for item in evidence] == ["policy-2-3"]
+    assert evidence[0]["title"] == "remote-work.txt"
+
+
 def test_run_skips_ollama_when_no_sources_match(ollama_api, monkeypatch):
     def unexpected_chat(*args, **kwargs):
         pytest.fail("Ollama must not be called for a run without retrieved evidence.")

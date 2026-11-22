@@ -1,14 +1,25 @@
 from __future__ import annotations
 
+from asyncio import Semaphore
 from pathlib import Path
+from typing import Annotated
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from agentmatrix.config import get_settings
+from agentmatrix.documents import (
+    MAX_FILE_BYTES,
+    MAX_POLICIES,
+    PolicyFileError,
+    PolicyText,
+    extract_policy,
+    policy_passages,
+)
 from agentmatrix.graph import build_graph
 from agentmatrix.model import OllamaError, ollama_model_ready
 from agentmatrix.observability import Trace
@@ -16,11 +27,13 @@ from agentmatrix.observability import Trace
 app = FastAPI(title="AgentMatrix Enterprise", version="0.1.0")
 WEB_DIRECTORY = Path(__file__).with_name("web")
 app.mount("/assets", StaticFiles(directory=WEB_DIRECTORY / "assets"), name="assets")
+policy_parser = Semaphore(1)
 
 
 class RunRequest(BaseModel):
     task: str = Field(min_length=3, max_length=8000)
     approved: bool = False
+    policies: list[PolicyText] = Field(default_factory=list, max_length=MAX_POLICIES)
 
 
 @app.get("/", include_in_schema=False)
@@ -45,11 +58,29 @@ def ready() -> dict:
     return {"status": "ready", "mode": settings.mode, "model": settings.ollama_model}
 
 
+@app.post("/v1/policies/extract")
+async def read_policy(
+    request: Request,
+    filename: Annotated[str, Query(min_length=1, max_length=255)],
+) -> PolicyText:
+    data = bytearray()
+    async for chunk in request.stream():
+        if len(data) + len(chunk) > MAX_FILE_BYTES:
+            raise HTTPException(status_code=413, detail="Choose a file up to 2 MB.")
+        data.extend(chunk)
+    async with policy_parser:
+        try:
+            return await run_in_threadpool(extract_policy, filename, bytes(data))
+        except PolicyFileError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @app.post("/v1/agent/run")
 def run_agent(request: RunRequest) -> dict:
     settings = get_settings()
     trace = Trace()
-    graph = build_graph(settings)
+    documents = policy_passages(request.policies) if request.policies else None
+    graph = build_graph(settings, documents=documents)
     try:
         result = graph.invoke(
             {
